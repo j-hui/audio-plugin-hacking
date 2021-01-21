@@ -166,15 +166,18 @@ void TestTake2AudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     // Alternatively, you can process the samples with the channels
     // interleaved by keeping the same state.
     
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
 
-        for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
-            channelData[sample] = buffer.getSample(channel, sample) * rawVolume;
-        }
-        
+    auto* channelDataLeft = buffer.getWritePointer (0);
+    auto* channelDataRight = buffer.getWritePointer(1);
+
+    for (int sample = 0; sample < buffer.getNumSamples(); ++sample) {
+        gainSmoothed = gainSmoothed - 0.005 * (gainSmoothed - rawVolume);
+
+        channelDataLeft[sample] *= gainSmoothed;
+        channelDataRight[sample] *= gainSmoothed;
     }
+        
+   
 
     
 }
