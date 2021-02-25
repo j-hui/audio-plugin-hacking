@@ -1,0 +1,19 @@
+
+This is a pitch shift plugin for week7.
+
+It depends on the FFTW3 library, which can be found here:
+
+http://www.fftw.org
+
+
+The audio processing comes from Will Pirkle's ASPiK SDK,
+and the files for that can be found here:
+
+https://www.willpirkle.com/support/juce-iplug-users/
+
+
+
+
+
+
+
