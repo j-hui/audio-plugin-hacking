@@ -1,0 +1,13 @@
+{
+    "soulPatchV1":
+    {
+        "ID":               "formant_filter",
+        "version":          "0.1",
+        "name":             "formant_filter",
+        "description":      "Audio plugin presentation",
+        "category":         "effect",
+        "isInstrument":     false,
+
+        "source":           [ "FormantFilter.soul", "Delay.soul", "Mixer.soul"]
+    }
+}

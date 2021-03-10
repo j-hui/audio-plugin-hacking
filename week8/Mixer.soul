@@ -1,0 +1,21 @@
+// Dry Wet mixer
+processor Mixer()
+{
+    input stream float<2> in1, in2;
+    input stream float mix;
+
+    output stream float<2> out;
+    
+    void run()
+    {
+        loop
+        {
+            let in2_gain = soul::dBtoGain( 10 * log(mix/100.0f) ); //percent -> dB -> gain
+            let in1_gain = 1.0f - in2_gain;
+
+            out << (in1 * in1_gain) + (in2 * in2_gain);
+
+            advance();
+        }
+    }
+}

@@ -1,0 +1,172 @@
+graph FormantFilter [[main]]
+{
+    input stream float<2> in;
+    output stream float<2> out;
+    
+    input
+    {
+        mixer.mix dryWetMix  [[ name:"Dry Wet Mix", min: 0, max: 100, init: 0, unit: "%", step: 0.1 ]];
+        formants.vowel       [[ name:"Vowel", min: 0, max: 100, init: 50, unit: "%", step: 1 ]];
+        formants.intensity   [[ name:"Intensity", min: 1, max: 25, init: 15, step: 1 ]];
+        formants.type        [[ name:"Type", min: 0, max: 2, init: 0, text: "u-a|a-i|o-e" ]];
+
+        delay.delayWet       [[ min: 0,  max: 100,  init:  0,  name: "Delay Wet", unit:"%",  step: 1 ]];
+        delay.delayLength    [[ min: 0,  max: 1000, init:  50,  name: "Delay Length",   unit: "ms", step: 1 ]];
+        delay.delayFeedback  [[ min: 0,  max: 100,  init:  25,  name: "Delay Feedback", unit: "%",  step: 1 ]];
+    }
+
+    let 
+    {
+        formants = Formants;
+        mixer = Mixer;
+        gain = soul::gain::FixedGain (float<2>, 0.80f);
+        delay = DelayGraph;
+    } 
+    
+    connection
+    {
+        in -> gain -> mixer.in1;
+        in -> formants.in; 
+
+        formants.out -> delay.audioIn;
+        delay.audioOut -> mixer.in2;
+
+        mixer.out -> out;
+    }
+}
+
+graph Formants()
+{
+    input stream float<2> in;
+    output stream float<2> out;
+
+    input tp.type type;
+    input event float vowel, intensity;
+
+    namespace eq = soul::filters(float<2>)::tpt::simper_eq;
+
+    let
+    {
+        tp = TypeProcessor;
+        
+        f1 = Formant;
+        f2 = Formant;
+        f3 = Formant;
+        f4 = Formant;
+
+        eq1 = eq::Processor;
+        eq2 = eq::Processor;
+        eq3 = eq::Processor;
+        eq4 = eq::Processor;
+        eq_mode = Values(float[] (2)); //bandpass filter
+        eq_q = Values(float[] (10.0f));
+
+        gain = soul::gain::FixedGain (float<2>, 0.8f);
+    }
+    
+    connection
+    {   
+        vowel -> f1.vowel, f2.vowel, f3.vowel, f4.vowel;
+
+        tp.freq_min[0] -> f1.freq_min_in;
+        tp.freq_max[0] -> f1.freq_max_in;
+        tp.gain_min[0] -> f1.gain_min_in;
+        tp.gain_max[0] -> f1.gain_max_in;       
+        
+        tp.freq_min[1] -> f2.freq_min_in;
+        tp.freq_max[1] -> f2.freq_max_in;
+        tp.gain_min[1] -> f2.gain_min_in;
+        tp.gain_max[1] -> f2.gain_max_in;       
+        
+        tp.freq_min[2] -> f3.freq_min_in;
+        tp.freq_max[2] -> f3.freq_max_in;
+        tp.gain_min[2] -> f3.gain_min_in;
+        tp.gain_max[2] -> f3.gain_max_in;       
+        
+        tp.freq_min[3] -> f4.freq_min_in;
+        tp.freq_max[3] -> f4.freq_max_in;
+        tp.gain_min[3] -> f4.gain_min_in;
+        tp.gain_max[3] -> f4.gain_max_in;       
+        
+        // Pass frequency and gain information to bandpass filter
+        f1.freq -> eq1.frequencyIn;
+        f2.freq -> eq2.frequencyIn;
+        f3.freq -> eq3.frequencyIn;
+        f4.freq -> eq4.frequencyIn;
+
+        f1.gain -> eq1.gainIn;
+        f2.gain -> eq2.gainIn;
+        f3.gain -> eq3.gainIn;
+        f4.gain -> eq4.gainIn;
+        eq_mode.out -> eq1.modeIn, eq2.modeIn, eq3.modeIn, eq4.modeIn;
+        intensity -> eq1.qualityIn, eq2.qualityIn, eq3.qualityIn, eq4.qualityIn;
+
+        //input & ouput connection
+        in -> eq1.in, eq2.in, eq3.in, eq4.in;
+        eq1.out, eq2.out, eq3.out, eq4.out -> gain -> out;
+    }
+}
+
+// Resolve type parameter to frequency band based on formant table
+processor TypeProcessor()
+{
+    input event float type;
+    output event float freq_min[4], freq_max[4], gain_min[4], gain_max[4];
+    
+    event type (float type) {
+        if (type == 0.0f) { 
+            freq_min << float[] (350.0f, 600.0f, 2400.0f, 2675.0f);
+            gain_min << float[] (0.0f, -20.0f, -32.0f, -28.0f);
+            freq_max << float[] (600.0f, 1040.0f, 2250.0f, 2450.0f);
+            gain_max << float[] (0.0f, -7.0f, -9.0f, -9.0f);
+        }
+        if (type == 1.0f){
+            freq_min << float[] (600.0f, 1040.0f, 2250.0f, 2450.0f);
+            freq_max << float[] (250.0f, 1750.0f, 2600.0f, 3050.0f);
+            gain_min << float[] (0.0f, -7.0f, -9.0f, -9.0f);
+            gain_max << float[] (-5.0f, -30.0f, -16.0f, -22.0f);
+        }
+        if (type == 2.0f){
+            freq_min << float[] (400.0f, 750.0f, 2400.0f, 2600.0f);
+            freq_max << float[] (450.0f, 1620.0f, 2400.0f, 2800.0f);
+            gain_min << float[] (-7.0f, -11.0f, -21.0f, -20.0f);
+            gain_max << float[] (0.0f, -12.0f, -9.0f, -12.0f);
+        }
+    }
+}
+
+// Handle vowel input
+processor Formant()
+{
+    input event float vowel, freq_max_in, freq_min_in, gain_max_in, gain_min_in;
+    output event float freq, gain;
+
+    float freq_max, freq_min, gain_max, gain_min, percentage;
+
+    event vowel       (float val) { percentage = val; onUpdate(); }
+    event freq_max_in (float val) { freq_max = val; onUpdate(); }
+    event freq_min_in (float val) { freq_min = val; onUpdate(); }
+    event gain_max_in (float val) { gain_max = val; onUpdate(); }
+    event gain_min_in (float val) { gain_min = val; onUpdate(); }
+
+    void onUpdate()
+    {
+        freq << lerp (freq_min, freq_max, percentage * (1.0f / 100.0f));
+        gain << soul::dBtoGain( lerp (gain_min, gain_max, percentage * (1.0f / 100.0f)) );
+    }
+}
+
+// Referenced from soul_libray
+processor Values (float[] vals)
+{
+    output event float out[vals.size];
+
+    void run()
+    {
+        for (wrap<vals.size> i){
+            out[i] << vals[i];
+        }
+
+        advance();
+    }
+}
